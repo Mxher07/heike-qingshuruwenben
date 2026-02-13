@@ -1,0 +1,28 @@
+{
+  "name": "napcat-plugin-autoupdate",
+  "plugin": "插件自动更新",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.mjs",
+  "description": "NapCat 插件自动更新管理器，定时检查已安装插件的最新版本并自动更新或提醒",
+  "author": "冷曦",
+  "napcat": {
+    "tags": [
+      "工具",
+      "管理"
+    ],
+    "minVersion": "4.14.0",
+    "homepage": "https://github.com/lengxi-root/napcat-plugin-autoupdate"
+  },
+  "dependencies": {
+    "napcat-types": "0.0.9"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "typescript": "^5.0.0",
+    "vite": "^6.0.0"
+  },
+  "scripts": {
+    "build": "vite build"
+  }
+}
