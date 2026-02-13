@@ -62,6 +62,19 @@ export async function runScheduledCheck (): Promise<void> {
 
   if (updates.length === 0) return;
 
+  // 过滤掉已通知过的更新（同一插件同一版本只通知一次）
+  const newUpdates = updates.filter(u => {
+    const key = `${u.pluginName}@${u.latestVersion}`;
+    return !pluginState.notifiedUpdates.has(key);
+  });
+
+  // 标记为已通知
+  const markNotified = (list: UpdateInfo[]) => {
+    for (const u of list) {
+      pluginState.notifiedUpdates.add(`${u.pluginName}@${u.latestVersion}`);
+    }
+  };
+
   if (pluginState.config.updateMode === 'auto') {
     // 自动更新模式：仅更新 autoUpdatePlugins 列表中的插件（空列表=全部）
     const autoList = new Set(pluginState.config.autoUpdatePlugins);
@@ -69,14 +82,19 @@ export async function runScheduledCheck (): Promise<void> {
       ? updates.filter(u => autoList.has(u.pluginName))
       : updates;
     if (toUpdate.length === 0) {
-      // 有更新但不在自动更新列表中，仅通知
-      await pushNotification(updates);
+      // 有更新但不在自动更新列表中，仅通知（未通知过的）
+      if (newUpdates.length > 0) {
+        await pushNotification(newUpdates);
+        markNotified(newUpdates);
+      }
       return;
     }
     const results: string[] = [];
     for (const update of toUpdate) {
       const ok = await installPlugin(update);
       results.push(`${update.displayName}: ${ok ? '✅ 成功' : '❌ 失败'}`);
+      // 更新成功后从已通知集合中移除（下次新版本会重新通知）
+      if (ok) pluginState.notifiedUpdates.delete(`${update.pluginName}@${update.latestVersion}`);
     }
     // 通知更新结果
     const text = ['🔄 插件自动更新完成', '', ...results].join('\n');
@@ -86,12 +104,18 @@ export async function runScheduledCheck (): Promise<void> {
     for (const uid of pluginState.config.notifyUsers) {
       await sendPrivateMsg(uid, text);
     }
-    // 如果还有不在自动更新列表中的更新，也通知
-    const remaining = updates.filter(u => !autoList.has(u.pluginName) && autoList.size > 0);
-    if (remaining.length > 0) await pushNotification(remaining);
+    // 如果还有不在自动更新列表中的更新，也通知（未通知过的）
+    const remaining = newUpdates.filter(u => !autoList.has(u.pluginName) && autoList.size > 0);
+    if (remaining.length > 0) {
+      await pushNotification(remaining);
+      markNotified(remaining);
+    }
   } else {
-    // 仅通知模式
-    await pushNotification(updates);
+    // 仅通知模式：只推送未通知过的
+    if (newUpdates.length > 0) {
+      await pushNotification(newUpdates);
+      markNotified(newUpdates);
+    }
   }
 }
 

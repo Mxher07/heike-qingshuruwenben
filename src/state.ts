@@ -22,6 +22,8 @@ class PluginState {
   availableUpdates: UpdateInfo[] = [];
   /** 上次检查时间 */
   lastCheckTime = 0;
+  /** 已通知过的更新（pluginName@version），避免重复推送 */
+  notifiedUpdates: Set<string> = new Set();
   /** 定时器 */
   checkTimer: ReturnType<typeof setInterval> | null = null;
 
