@@ -9,6 +9,7 @@ export function registerApiRoutes (router: any): void {
     res.json({
       success: true,
       config: pluginState.config,
+      version: pluginState.version,
     });
   });
 

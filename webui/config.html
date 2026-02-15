@@ -573,7 +573,7 @@
         </div>
         <div>
           <h1 style="font-size:14px;font-weight:700;line-height:1.25">插件自动更新</h1>
-          <p style="font-size:10px;color:var(--text3)">v1.0.0</p>
+          <p style="font-size:10px;color:var(--text3)" id="sidebar-ver">插件自动更新</p>
         </div>
       </div>
       <nav style="flex:1;padding:4px 10px;overflow-y:auto" class="scr">
@@ -898,6 +898,7 @@
       const r = await api('/config');
       if (!r.success) return;
       config = r.config;
+      if (r.version) { document.getElementById('sidebar-ver').textContent = 'v' + r.version; }
       document.getElementById('cfg-mode').value = config.updateMode || 'notify';
       const schEl = document.getElementById('cfg-schedule');
       if (config.enableSchedule) schEl.classList.add('on'); else schEl.classList.remove('on');

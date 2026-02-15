@@ -1,7 +1,7 @@
 {
   "name": "napcat-plugin-autoupdate",
   "plugin": "插件自动更新",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "type": "module",
   "main": "index.mjs",
   "description": "NapCat 插件自动更新管理器，定时检查已安装插件的最新版本并自动更新或提醒",
