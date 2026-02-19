@@ -624,7 +624,7 @@
             </svg>
             GitHub
           </a>
-          <a href="https://qm.qq.com/q/GO9Bbru1qg" target="_blank"
+          <a href="https://qm.qq.com/q/oB5hdOZcuQ" target="_blank"
             style="color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:3px">
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
               stroke-linecap="round" stroke-linejoin="round">
@@ -686,6 +686,40 @@
             <div class="sec-t">可更新插件</div>
             <div id="updates-list">
               <p style="color:var(--text3);font-size:13px">暂无更新，点击"检查更新"开始</p>
+            </div>
+          </div>
+          <!-- Puppeteer 渲染服务 -->
+          <div class="glass" style="padding:16px;margin-top:16px" id="card-puppeteer">
+            <div style="display:flex;justify-content:space-between;align-items:center">
+              <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+                <div
+                  style="width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:rgba(234,179,8,.12);border-radius:8px;flex-shrink:0">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#eab308" stroke-width="2"
+                    stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="2" y="3" width="20" height="14" rx="2" />
+                    <path d="M8 21h8" />
+                    <path d="M12 17v4" />
+                  </svg>
+                </div>
+                <div style="min-width:0">
+                  <div style="font-size:13px;font-weight:600">Puppeteer 渲染服务 <span id="pptr-version"
+                      style="font-size:11px;font-weight:400;color:var(--text3)"></span></div>
+                  <div style="font-size:11px;color:var(--text3);display:flex;align-items:center;gap:6px">
+                    <span id="pptr-status">检查中...</span>
+                    <span>·</span>
+                    <a href="https://github.com/AQiaoYo/napcat-plugin-puppeteer" target="_blank"
+                      style="color:var(--accent);text-decoration:none;display:inline-flex;align-items:center;gap:2px"><svg
+                        width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M15 3h6v6" />
+                        <path d="M10 14 21 3" />
+                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                      </svg> GitHub</a>
+                  </div>
+                </div>
+              </div>
+              <button id="pptr-btn" class="btn btn-p" style="padding:5px 14px;font-size:12px" onclick="installPptr()"
+                disabled>安装</button>
             </div>
           </div>
         </div>
@@ -1185,8 +1219,72 @@
       }
     }
 
+    // ===== 插件安装 =====
+    const PPTR_REPO = 'AQiaoYo/napcat-plugin-puppeteer';
+
+    async function checkPptr () {
+      const verEl = document.getElementById('pptr-version');
+      const statusEl = document.getElementById('pptr-status');
+      const btnEl = document.getElementById('pptr-btn');
+      try {
+        const r = await api('/github/check/AQiaoYo/napcat-plugin-puppeteer');
+        const remote = r.success ? r.data : null;
+        const local = r.success ? r.installed : null;
+
+        verEl.textContent = remote ? 'v' + remote.version : '';
+
+        if (local) {
+          statusEl.innerHTML = '<span style="color:var(--accent)">✓ 已安装 v' + local.version + '</span>';
+          if (remote && remote.version !== local.version) {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '更新';
+            btnEl.className = 'btn btn-w';
+            btnEl.style.cssText = 'padding:5px 14px;font-size:12px';
+          } else {
+            btnEl.disabled = false;
+            btnEl.innerHTML = '重新安装';
+            btnEl.className = 'btn btn-s';
+            btnEl.style.cssText = 'padding:5px 14px;font-size:12px';
+          }
+        } else {
+          statusEl.innerHTML = '未安装';
+          btnEl.disabled = false;
+          btnEl.innerHTML = '安装';
+          btnEl.className = 'btn btn-p';
+          btnEl.style.cssText = 'padding:5px 14px;font-size:12px';
+        }
+      } catch {
+        statusEl.innerHTML = '未安装';
+        btnEl.disabled = false;
+        btnEl.innerHTML = '安装';
+        btnEl.className = 'btn btn-p';
+        btnEl.style.cssText = 'padding:5px 14px;font-size:12px';
+      }
+    }
+
+    async function installPptr () {
+      const btnEl = document.getElementById('pptr-btn');
+      btnEl.disabled = true;
+      btnEl.innerHTML = '安装中...';
+      try {
+        const r = await api('/github/install', 'POST', { repo: PPTR_REPO });
+        if (r.success) {
+          toast('Puppeteer 渲染服务安装成功' + (r.version ? ' v' + r.version : ''), 'success');
+          checkPptr();
+        } else {
+          toast('安装失败: ' + (r.error || '未知错误'), 'error');
+          btnEl.disabled = false;
+          btnEl.innerHTML = '重试';
+          btnEl.className = 'btn btn-d';
+        }
+      } catch (e) {
+        toast('请求失败: ' + e, 'error');
+        btnEl.disabled = false;
+      }
+    }
+
     // 初始化
-    loadConfig().then(() => loadUpdates()).then(() => loadPlugins());
+    loadConfig().then(() => loadUpdates()).then(() => { loadPlugins(); checkPptr(); });
   </script>
 </body>
 

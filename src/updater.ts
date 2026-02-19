@@ -504,3 +504,104 @@ export async function pingDownloadMirrors (): Promise<MirrorPingResult[]> {
     return a.latency - b.latency;
   });
 }
+
+/** 从 GitHub 仓库安装插件（获取最新 release 的 zip 资产） */
+export async function installFromGithub (repo: string): Promise<{ success: boolean; version?: string; error?: string; }> {
+  const pm = pluginState.pluginManager;
+  if (!pm) return { success: false, error: 'pluginManager 不可用' };
+
+  pluginState.log('info', `正在从 GitHub 安装: ${repo}`);
+
+  const pluginName = repo.split('/').pop() || repo;
+  const pluginsDir = pm.getPluginPath();
+  const pluginDir = path.join(pluginsDir, pluginName);
+  const tmpZip = path.join(pluginsDir, `${pluginName}.temp.zip`);
+
+  try {
+    // 获取最新 release 信息
+    const apiUrl = `https://api.github.com/repos/${repo}/releases/latest`;
+    let releaseData: any = null;
+    try {
+      pluginState.debug(`获取 release 信息: ${apiUrl}`);
+      const res = await fetch(apiUrl, {
+        headers: { 'User-Agent': 'napcat-plugin-autoupdate', Accept: 'application/vnd.github.v3+json' },
+        signal: AbortSignal.timeout(15000),
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      releaseData = await res.json();
+    } catch (e) {
+      pluginState.debug(`获取 release 失败: ${e}`);
+    }
+
+    if (!releaseData) return { success: false, error: '无法获取 GitHub Release 信息' };
+
+    const version = (releaseData.tag_name || '').replace(/^v/i, '');
+    pluginState.log('info', `最新版本: ${version || releaseData.tag_name}`);
+
+    // 找到 zip 资产
+    let downloadUrl = '';
+    const assets = releaseData.assets || [];
+    const zipAsset = assets.find((a: any) => a.name && a.name.endsWith('.zip'));
+    if (zipAsset) {
+      downloadUrl = zipAsset.browser_download_url;
+    } else {
+      downloadUrl = releaseData.zipball_url || '';
+    }
+    if (!downloadUrl) return { success: false, error: '未找到可下载的 zip 文件' };
+
+    pluginState.log('info', `下载地址: ${downloadUrl}`);
+
+    // 备份用户配置
+    const configBackup = path.join(pluginsDir, `${pluginName}.config.bak`);
+    const userConfigPath = path.join(pluginDir, 'data', 'config.json');
+    if (fs.existsSync(userConfigPath)) {
+      fs.copyFileSync(userConfigPath, configBackup);
+    }
+
+    // 下载 & 解压
+    await downloadWithMirror(downloadUrl, tmpZip);
+    await extractZip(tmpZip, pluginDir);
+
+    // 恢复用户配置
+    if (fs.existsSync(configBackup)) {
+      const dataDir = path.join(pluginDir, 'data');
+      if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+      fs.copyFileSync(configBackup, userConfigPath);
+      fs.unlinkSync(configBackup);
+    }
+
+    // 加载/重载插件
+    const existing = pm.getPluginInfo(pluginName);
+    if (existing) {
+      await pm.reloadPlugin(pluginName);
+    } else {
+      await pm.loadPluginById(pluginName);
+    }
+
+    pluginState.log('info', `✅ ${pluginName} 安装成功 (v${version})`);
+    return { success: true, version };
+  } catch (e) {
+    pluginState.log('error', `安装 ${pluginName} 失败: ${e}`);
+    return { success: false, error: String(e) };
+  } finally {
+    if (fs.existsSync(tmpZip)) fs.unlinkSync(tmpZip);
+  }
+}
+
+/** 检查 GitHub 仓库最新 release 版本 */
+export async function checkGithubRelease (repo: string): Promise<{ version: string; publishedAt: string; } | null> {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${repo}/releases/latest`, {
+      headers: { 'User-Agent': 'napcat-plugin-autoupdate', Accept: 'application/vnd.github.v3+json' },
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!res.ok) return null;
+    const data = await res.json() as any;
+    return {
+      version: (data.tag_name || '').replace(/^v/i, ''),
+      publishedAt: data.published_at || '',
+    };
+  } catch {
+    return null;
+  }
+}

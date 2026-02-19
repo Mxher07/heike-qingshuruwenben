@@ -1,6 +1,6 @@
 // WebUI API 路由
 import { pluginState } from './state';
-import { checkAllUpdates, checkSinglePlugin, installPlugin, getInstalledPlugins, pingRawMirrors, pingDownloadMirrors, GITHUB_RAW_MIRRORS, DOWNLOAD_MIRRORS } from './updater';
+import { checkAllUpdates, checkSinglePlugin, installPlugin, getInstalledPlugins, pingRawMirrors, pingDownloadMirrors, GITHUB_RAW_MIRRORS, DOWNLOAD_MIRRORS, installFromGithub, checkGithubRelease } from './updater';
 import { startScheduler, stopScheduler } from './scheduler';
 
 export function registerApiRoutes (router: any): void {
@@ -176,5 +176,37 @@ export function registerApiRoutes (router: any): void {
     pluginState.saveConfig();
     pluginState.log('info', `镜像已切换: ${type} → ${mirror || '自动'}`);
     res.json({ success: true });
+  });
+
+  // ===== GitHub 插件安装 =====
+
+  // 检查 GitHub 仓库最新版本
+  router.getNoAuth('/github/check/:owner/:repo', async (req: any, res: any) => {
+    const { owner, repo } = req.params as { owner: string; repo: string; };
+    try {
+      const info = await checkGithubRelease(`${owner}/${repo}`);
+      // 确保已扫描插件列表
+      if (pluginState.installedPlugins.length === 0) await getInstalledPlugins();
+      const installed = pluginState.installedPlugins.find(p => p.name === repo);
+      res.json({
+        success: true,
+        data: info,
+        installed: installed ? { version: installed.currentVersion, status: installed.status } : null,
+      });
+    } catch (e) {
+      res.json({ success: false, error: String(e) });
+    }
+  });
+
+  // 从 GitHub 安装插件
+  router.postNoAuth('/github/install', async (req: any, res: any) => {
+    const { repo } = req.body as { repo?: string; };
+    if (!repo) { res.json({ success: false, error: '缺少 repo 参数' }); return; }
+    try {
+      const result = await installFromGithub(repo);
+      res.json(result);
+    } catch (e) {
+      res.json({ success: false, error: String(e) });
+    }
   });
 }

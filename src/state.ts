@@ -46,7 +46,9 @@ class PluginState {
   private readonly maxLogEntries = 300;
 
   log (level: 'info' | 'warn' | 'error', msg: string): void {
-    this.logger?.[level](`[AutoUpdate] ${msg}`);
+    const tag = `[AutoUpdate] ${msg}`;
+    this.logger?.[level](tag);
+    console.log(`[${level.toUpperCase()}] ${tag}`);
     this.logBuffer.push({ time: Date.now(), level, msg });
     if (this.logBuffer.length > this.maxLogEntries) this.logBuffer.splice(0, this.logBuffer.length - this.maxLogEntries);
   }
